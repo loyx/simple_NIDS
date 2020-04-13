@@ -21,11 +21,11 @@ def main():
 
     """train"""
     cluster_tree = ClusterTree()
-    km = Kmeans(tree=cluster_tree, kid=Kmeans.KMEANS_ID, level=1, num_dimensions=MAX_ATTRIBUTES+1)
+    km = Kmeans(tree=cluster_tree, kid=Kmeans.KMEANS_ID, level=1, num_dimensions=MAX_ATTRIBUTES + 1)
     km.readTrainData(train_data_path)
     k_value = MAX_LABELS
 
-    with redirection(LOG_FILE, 'a'):
+    with redirection(LOG_FILE, 'w'):
         print("Init K-value = ", k_value)
 
     km.runKmeans(k_value)
@@ -46,17 +46,19 @@ def main():
     cfs_matrix = ConfuseMatrix()
     right_rcd_mun = 0
     test_rcd_mun = 0
-    with redirection(RESULT_FILE, 'a'):
+    with redirection(RESULT_FILE, 'w'):
         print(format_msg('*', "Classification result"))
+    fmt = "True Label = {} Pre Label = {} Cluster Path = {}"
     for record in reader:
         predict = cluster_tree.findNearestCluster(record)
         if record.label == predict.getClusterNodeLabel():
             right_rcd_mun += 1
         cfs_matrix.update(record.label, predict.getClusterNodeLabel())
 
-        with record(RESULT_FILE, 'a'):
-            print("True Label = {} Pre Label = {}".format(LABEL_NAMES[record.label],
-                                                          LABEL_NAMES[predict.getClusterNodeLabel()]))
+        with redirection(RESULT_FILE, 'a'):
+            print(fmt.format(LABEL_NAMES[record.label],
+                             LABEL_NAMES[predict.getClusterNodeLabel()],
+                             predict.strPath))
         test_rcd_mun += 1
         if test_rcd_mun % 10000 == 0:
             print("{} records have been done ...".format(test_rcd_mun))
@@ -69,10 +71,10 @@ def main():
 
     print(format_msg('=', "Classify Result"))
     fmt = "Total test record = {} Right label record = {} Right Rate = {}"
-    print(fmt.format(test_rcd_mun, right_rcd_mun, right_rcd_mun/test_rcd_mun))
+    print(fmt.format(test_rcd_mun, right_rcd_mun, right_rcd_mun / test_rcd_mun))
     with redirection(RESULT_FILE, 'a'):
         print(format_msg('=', "Classify Result"))
-        print(fmt.format(test_rcd_mun, right_rcd_mun, right_rcd_mun/test_rcd_mun))
+        print(fmt.format(test_rcd_mun, right_rcd_mun, right_rcd_mun / test_rcd_mun))
 
     cfs_matrix.print()
     cfs_matrix.printLog()

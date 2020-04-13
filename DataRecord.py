@@ -10,7 +10,7 @@ LOG_FILE = "Log.txt"
 RESULT_FILE = "Result.txt"
 
 INNER_LEVEL = 3
-MAX_LEVEL = 8
+MAX_LEVEL = 10
 CLUSTER_PRECISION = 0.1
 
 ATTRIBUTE_NAMES = [
@@ -130,7 +130,7 @@ class DataNode:
         c_weight = 1
         cnt = 0
         while cnt < 3:
-            dist += c_weight*int(next(gen_other) == next(gen_self))
+            dist += c_weight*int(next(gen_other) != next(gen_self))
             cnt += 1
 
         """ 其余属性计算欧式距离 """
@@ -145,13 +145,29 @@ class DataNode:
         """
         data = str_record.split(',')
         attributes = list(map(float, data[:-1]))
+        if len(attributes) == MAX_ATTRIBUTES + 2:
+            del attributes[6]
+            del attributes[8]
         assert len(attributes) == MAX_ATTRIBUTES
         label = int(data[-1])
         return cls(attributes, label)
 
 
 if __name__ == '__main__':
-    test = "2,7,6,181,5450,0,0,0,0,8,8,0,100,0,9,100,0,11,0,0,0"
-    dr = DataNode.fromstr(test)
-    print(dr)
-    print(dr.Count)
+    test1 = "2,7,6,181,5450,0,0,0,0,8,8,0,100,0,9,100,0,11,0,0,0"
+    test2 = "2,7,6,239,486,0,0,0,0,8,8,0,100,0,19,100,0,5,0,0,0"
+    dr1 = DataNode.fromstr(test1)
+    dr2 = DataNode.fromstr(test2)
+    print(dr1, dr2)
+    dr1 += dr2
+    print(dr1)
+    dr1 /= 2
+    print(dr1)
+    dr1.EucNorm(dr2)
+    print(dr1.EucNorm(dr1))
+    from copy import deepcopy
+    dr3 = deepcopy(dr1)
+    dr3.label = 1
+    print(dr3 == dr1)
+    dr3[0] = 1
+    print(dr3 == dr1)

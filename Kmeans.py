@@ -1,10 +1,8 @@
 """
 Kmeans主程序及相关类
 """
-from itertools import takewhile
-from copy import deepcopy
-from DataRecord import *
 from ClusterTree import *
+from copy import deepcopy
 
 
 class ConfuseMatrix:
@@ -21,8 +19,8 @@ class ConfuseMatrix:
     def __str__(self):
         fmt = "{:{align}10}"
         msg = fmt.format("T/P", align='^')
-        for label in LABEL_NAMES:
-            msg += fmt.format(label, align='^')
+        for l_name in LABEL_NAMES:
+            msg += fmt.format(l_name, align='^')
         for index, row in enumerate(self.matrix):
             msg += '\n'
             msg += fmt.format(LABEL_NAMES[index], align='^')
@@ -31,7 +29,7 @@ class ConfuseMatrix:
         return msg
 
     def print(self):
-        print(format_msg("Confusion Matrix"))
+        print(format_msg('=', "Confusion Matrix"))
         print(self)
 
     def printLog(self):
@@ -57,7 +55,7 @@ class Kmeans:
     KMEANS_ID = 0
 
     def __init__(self, tree: ClusterTree, kid, level, num_dimensions,
-                 data_list=None, self_node=None):
+                 data_list=None, self_node=None, num_record=0):
         self.inFile = None
 
         """ 训练数据集 """
@@ -67,7 +65,7 @@ class Kmeans:
 
         """ garbage """
         self.numClusters = 0
-        self.numRecord = 0
+        self.numRecord = num_record
         self.numDimension = num_dimensions
 
         """ 算法执行过程中的数据结构 """
@@ -122,16 +120,24 @@ class Kmeans:
             cluster.memberList.clear()
             cluster.numMembers = 0
 
+        cnt = 0
+        total = self.numRecord
         for record in self.recordList:
+            cnt += 1
+            if cnt % 100000 == 0:
+                print("distribute: {}/{}".format(cnt, total))
             closet_cluster = self.findClosetCluster(record)
             closet_cluster.memberList.append(record)
             closet_cluster.numMembers += 1
+        print("distribute finished!")
 
     def calNewClusterCenter(self):
         """
         重新计算聚类中心点
         """
         same_as_before = []
+        cnt = 0
+        le = self.numClusters
         for cluster in self.clusters:
             """
             每个中心点前三个数据取众数，其余取平均数，label无意义
@@ -139,13 +145,13 @@ class Kmeans:
             new_center = DataNode()
 
             """计算平均"""
-            counter = [dict()] * 3
+            counter = [dict() for _ in range(3)]
             for record in cluster.memberList:
                 for index in range(3):
                     try:
-                        counter[index][record[index]] += 1
+                        counter[int(index)][record[index]] += 1
                     except KeyError:
-                        counter[index][record[index]] = 1
+                        counter[int(index)][record[index]] = 1
                 new_center += record
             new_center /= cluster.numMembers
 
@@ -153,7 +159,7 @@ class Kmeans:
             for index in range(3):
                 max_value = 0
                 max_key = None
-                for key, value in counter[index].items():
+                for key, value in counter[int(index)].items():
                     if value > max_value:
                         max_value = value
                         max_key = key
@@ -161,8 +167,11 @@ class Kmeans:
 
             """判断是否和前中心点一样，不考虑label"""
             same_as_before.append(all(a == b for a, b in zip(cluster.center, new_center)))
-
             cluster.center = new_center
+
+            cnt += 1
+            print("calculate new center:{}/{}".format(cnt, le))
+
         return all(same_as_before)
 
     def findClosetCluster(self, record: DataNode) -> Cluster:
@@ -242,7 +251,6 @@ class Kmeans:
                     print(format_msg('-'))
 
             else:
-                self.printClusterLabel(index)
                 next_k_value = self.getDiffLabelOfCluster(index)
 
                 fmt = "Level: {} Kmeans: {} cluster: {} need go on!"
@@ -254,12 +262,14 @@ class Kmeans:
                     print(format_msg('-', length=40))
                     print("Set k = ", next_k_value)
 
-                next_train_data = self.getClusterList(index)
+                self.printClusterLabel(index)
+
+                next_train_data, data_size = self.getClusterList(index)
                 next_level = self.clusterLevel + 1
                 Kmeans.KMEANS_ID += 1
                 next_kmeans = Kmeans(self.clusterTree, self.KMEANS_ID, next_level,
                                      MAX_ATTRIBUTES + 1, next_train_data,
-                                     self.clusterNodes[index])
+                                     self.clusterNodes[index], data_size)
                 next_kmeans.runKmeans(next_k_value)
 
                 print(format_msg('-', length=40))
@@ -284,15 +294,15 @@ class Kmeans:
         持久化聚类结果
         """
 
-        print(format_msg('*', "Cluster Level" + str(self.clusterLevel)))
+        print(format_msg('*', ("Cluster Level" + str(self.clusterLevel))))
         with redirection(LOG_FILE, 'a'):
-            print(format_msg('*', "Cluster Level" + str(self.clusterLevel)))
+            print(format_msg('*', ("Cluster Level" + str(self.clusterLevel))))
 
-        for cluster_id, cluster, cluster_node in enumerate(zip(self.clusters, self.clusterNodes)):
+        for cluster_id, (cluster, cluster_node) in enumerate(zip(self.clusters, self.clusterNodes)):
 
-            print('-', "Keams:{} Cluster:{}".format(self.kmeansID, cluster_id))
+            print(format_msg('-', "Keams:{} Cluster:{}".format(self.kmeansID, cluster_id)))
             with redirection(LOG_FILE, 'a'):
-                print('-', "Keams:{} Cluster:{}".format(self.kmeansID, cluster_id))
+                print(format_msg('-', "Keams:{} Cluster:{}".format(self.kmeansID, cluster_id)))
 
             label_counter, max_label = self.countClusterLabel(cluster)
             for index, label_num in enumerate(label_counter):
@@ -304,9 +314,9 @@ class Kmeans:
                 print(fmt.format(name, value))
                 with redirection(LOG_FILE, 'a'):
                     print(fmt.format(name, value))
-        print('*')
+        print(format_msg('*'))
         with redirection(LOG_FILE, 'a'):
-            print('*')
+            print(format_msg('*'))
 
     def getPrecisionAndOtherLabel(self, cluster: Cluster):
         label_counter, max_label = self.countClusterLabel(cluster)
@@ -342,29 +352,26 @@ class Kmeans:
         """
         根据当前聚集类的层、杂质label个数和聚类精度判断是否聚类合理
         """
+        assert self.clusterLevel <= MAX_LEVEL
         if self.clusterLevel <= INNER_LEVEL:  # 当前聚类层数小于3
             if other_label_num > 100:  # 层数小， 杂质label大于100，直接要求再聚类
                 setFalseCondition(other_label_num, 100)
                 return False
-            elif precision < CLUSTER_PRECISION:
+            elif precision <= CLUSTER_PRECISION:
                 setTrueCondition(precision, 0, CLUSTER_PRECISION)
                 return True
             else:
                 setFalseCondition(precision, CLUSTER_PRECISION)
                 return False
-        elif self.clusterLevel <= MAX_LEVEL:  # 聚类层数大于3小于8
+        elif self.clusterLevel < MAX_LEVEL:  # 聚类层数大于3小于8
 
             diff_level = self.clusterLevel - INNER_LEVEL
 
             if other_label_num > 500:
                 setFalseCondition(other_label_num, 500)
                 return False
-            elif precision < diff_level * CLUSTER_PRECISION:
-                c = CLUSTER_PRECISION
-                internal = takewhile(lambda x: x*c < precision <= x*c+c, range(1, diff_level+1))
-                internal = next(internal)
-                start, end = internal*c, (internal+1)*c
-                setTrueCondition(precision, start, end)
+            elif precision <= diff_level * CLUSTER_PRECISION:
+                setTrueCondition(precision, 0, diff_level * CLUSTER_PRECISION)
                 return True
             else:
                 setFalseCondition(precision, diff_level*CLUSTER_PRECISION)
@@ -372,12 +379,13 @@ class Kmeans:
         else:  # 聚类层数过深异常结束
             self.selfClusterNode.isLeaf = 2
             self.selfClusterNode.isClusterOK = True
+            return True
 
     def getClusterList(self, index):
         """
         获取聚类对应的数据集
         """
-        return self.clusters[index].memberList
+        return self.clusters[index].memberList, self.clusters[index].numMembers
 
     def printClusterLabel(self, index):
         """
@@ -386,13 +394,13 @@ class Kmeans:
         label_count, _ = self.countClusterLabel(self.clusters[index])
 
         fmt = "{} = {}"
-        print(format_msg(' ', "Cluster " + self.clusterLevel + '.' + index))
+        print(format_msg(' ', "Cluster {}.{}".format(self.clusterLevel, index)))
         print(format_msg('-', length=30))
         for name, value in zip(LABEL_NAMES, label_count):
             print(fmt.format(name, value))
 
         with redirection(LOG_FILE, 'a'):
-            print(format_msg(' ', "Cluster " + self.clusterLevel + '.' + index))
+            print(format_msg(' ', "Cluster {}.{}".format(self.clusterLevel, index)))
             print(format_msg('-', length=30))
             for name, value in zip(LABEL_NAMES, label_count):
                 print(fmt.format(name, value))
@@ -411,9 +419,10 @@ class Kmeans:
         assert len(self.clusterNodes) == 0
         for cluster in self.clusters:
             cluster_node = ClusterNode()
-            cluster_node.center = deepcopy(cluster)
+            cluster_node.center = deepcopy(cluster.center)
             self.clusterNodes.append(cluster_node)
             self.clusterTree.insertNode(parent, cluster_node)
+        # assert len(self.clusterNodes) == len(self.clusters)
 
 
 if __name__ == '__main__':
